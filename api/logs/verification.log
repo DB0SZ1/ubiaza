@@ -1,0 +1,5 @@
+[2025-08-05T00:12:50.918129+02:00] verification.INFO: CSRF token validated for IP: ::1, token: 38b95879cc8f17e709bd6107565d2ff0e51c3ae22cd633a72ab36935d7c94c4b [] []
+[2025-08-05T00:17:20.317767+02:00] verification.WARNING: Error response: Invalid CSRF token, code: 403, details: [], IP: ::1 [] []
+[2025-08-05T00:18:06.717954+02:00] verification.INFO: CSRF token validated for IP: ::1, token: 593840494f2e96b70b38e6e37d19c04c671ea33c16cec571b01a54c01601f933 [] []
+[2025-08-05T00:18:12.797555+02:00] verification.INFO: Mono API response for endpoint v2/lookup/bvn/initiate: {"status":"failed","timestamp":"2025-08-04T22:18:12.546Z","message":"Your business does not have access to Lookup, please request for access on your dashboard by going to lookup tab."} [] []
+[2025-08-05T00:18:12.803513+02:00] verification.WARNING: Error response: BVN resolution failed, code: 400, details: {"status":"failed","timestamp":"2025-08-04T22:18:12.546Z","message":"Your business does not have access to Lookup, please request for access on your dashboard by going to lookup tab."}, IP: ::1 [] []
