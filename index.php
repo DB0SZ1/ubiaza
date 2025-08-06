@@ -20,8 +20,8 @@ if (isset($_SESSION['user_id'])) {
             <a href="#" class="logo"><img src="assets/images/logo.png" alt="Ubiaza Logo">Ubiaza</a>
             <nav class="nav-menu">
                 <a href="#home">Home</a>
-                <a href="#about">About Us</a>
-                <a href="#features">Features</a>
+                <a href="about.php">About Us</a>
+                <a href="blog.php">Blog</a>
                 <a href="sign.php">Login</a>
             </nav>
             <div class="nav-actions">
@@ -60,6 +60,11 @@ if (isset($_SESSION['user_id'])) {
                     <div class="feature-icon"><i class="fas fa-money-bill-wave"></i></div>
                     <h3 class="feature-title">Local Transfers</h3>
                     <p class="feature-description">Send money across Nigeria instantly</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                    <h3 class="feature-title">Loans</h3>
+                    <p class="feature-description">Easy Loans</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-lock"></i></div>
@@ -244,7 +249,7 @@ if (isset($_SESSION['user_id'])) {
     <footer class="footer">
         <div class="footer-container">
             <div class="footer-section">
-                <h3>Ubiaza</h3>
+                <h3><h3><a href="#" class="logo"><img src="assets/images/logo.png" alt="Ubiaza Logo">Ubiaza</a>Ubiaza</h3>
                 <p>Your trusted partner for local banking and savings in Nigeria.</p>
             </div>
             <div class="footer-section">
@@ -253,6 +258,7 @@ if (isset($_SESSION['user_id'])) {
                     <li><a href="#home">Home</a></li>
                     <li><a href="#about">About Us</a></li>
                     <li><a href="#contact">Contact Us</a></li>
+                    <li><a href="support.php">Support</a></li>
                 </ul>
             </div>
             <div class="footer-section">
@@ -265,7 +271,7 @@ if (isset($_SESSION['user_id'])) {
             </div>
             <div class="footer-section">
                 <h3>Contact</h3>
-                <p>Email: support@ubiaza.ng</p>
+                <p>Email: support@ubiaza.io</p>
                 <p>Phone: +234 123 456 7890</p>
             </div>
         </div>
