@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 require_once 'db.php';
@@ -52,7 +53,7 @@ if (!isset($_SESSION['registration_data'])) {
         'bvnMethod' => '',
         'bvnValue' => null,
         'ninMethod' => '',
-        'ninValue' => '', // Added for NIN number
+        'ninValue' => '',
         'ninFiles' => ['front' => null, 'back' => null]
     ];
 }
@@ -664,7 +665,7 @@ $success = isset($_GET['success']) ? htmlspecialchars($_GET['success'], ENT_QUOT
                 </form>
 
                 <div class="form-footer">
-                    Don't have an account? <a href="#" onclick="showRegister()">Create an account</a>
+                    Don't have an account? <a href="#" onclick="showRegister()">Create an account</a> | Are you an admin? <a href="admin_login.php">Click here</a>
                 </div>
             </div>
         </div>

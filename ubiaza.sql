@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 07, 2025 at 08:13 AM
+-- Generation Time: Aug 07, 2025 at 03:19 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -39,6 +39,53 @@ CREATE TABLE `accounts` (
   `pending_balance` decimal(15,2) DEFAULT 0.00,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admins`
+--
+
+CREATE TABLE `admins` (
+  `id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `full_name` varchar(100) NOT NULL,
+  `role` enum('super_admin','admin','moderator') DEFAULT 'admin',
+  `permissions` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`permissions`)),
+  `is_active` tinyint(1) DEFAULT 1,
+  `last_login` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `admins`
+--
+
+INSERT INTO `admins` (`id`, `username`, `email`, `password_hash`, `full_name`, `role`, `permissions`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
+(1, 'superadmin', 'admin@ubiaza.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Super Administrator', 'super_admin', '[\"all\"]', 1, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(2, 'admin', 'admin2@ubiaza.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Administrator', 'admin', '[\"users\", \"transactions\", \"settings\"]', 1, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admin_activity_logs`
+--
+
+CREATE TABLE `admin_activity_logs` (
+  `id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `target_type` varchar(50) DEFAULT NULL,
+  `target_id` int(11) DEFAULT NULL,
+  `description` text NOT NULL,
+  `data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`data`)),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -505,6 +552,20 @@ CREATE TABLE `system_settings` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `system_settings`
+--
+
+INSERT INTO `system_settings` (`id`, `key`, `value`, `type`, `description`, `is_public`, `updated_by`, `created_at`, `updated_at`) VALUES
+(1, 'app_name', 'Ubiaza', 'string', 'Application Name', 1, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(2, 'maintenance_mode', '0', 'boolean', 'Enable maintenance mode', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(3, 'daily_transfer_limit', '5000000.00', 'float', 'Daily transfer limit per user', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(4, 'single_transaction_limit', '1000000.00', 'float', 'Single transaction limit', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(5, 'transfer_fee', '10.00', 'float', 'Fee per transfer', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(6, 'bill_payment_fee', '50.00', 'float', 'Fee for bill payments', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(7, 'airtime_cashback', '2.00', 'float', 'Cashback percentage for airtime', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59'),
+(8, 'data_cashback', '1.50', 'float', 'Cashback percentage for data', 0, NULL, '2025-08-07 13:14:59', '2025-08-07 13:14:59');
+
 -- --------------------------------------------------------
 
 --
@@ -642,6 +703,23 @@ ALTER TABLE `accounts`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `user_id` (`user_id`),
   ADD UNIQUE KEY `account_number` (`account_number`);
+
+--
+-- Indexes for table `admins`
+--
+ALTER TABLE `admins`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
+-- Indexes for table `admin_activity_logs`
+--
+ALTER TABLE `admin_activity_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `admin_id` (`admin_id`),
+  ADD KEY `action` (`action`),
+  ADD KEY `created_at` (`created_at`);
 
 --
 -- Indexes for table `app_versions`
@@ -868,6 +946,18 @@ ALTER TABLE `accounts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
+-- AUTO_INCREMENT for table `admins`
+--
+ALTER TABLE `admins`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `admin_activity_logs`
+--
+ALTER TABLE `admin_activity_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `app_versions`
 --
 ALTER TABLE `app_versions`
@@ -991,7 +1081,7 @@ ALTER TABLE `support_tickets`
 -- AUTO_INCREMENT for table `system_settings`
 --
 ALTER TABLE `system_settings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `transactions`
@@ -1026,6 +1116,12 @@ ALTER TABLE `user_sessions`
 --
 ALTER TABLE `accounts`
   ADD CONSTRAINT `accounts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `admin_activity_logs`
+--
+ALTER TABLE `admin_activity_logs`
+  ADD CONSTRAINT `admin_activity_logs_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `admins` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `beneficiaries`

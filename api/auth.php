@@ -408,6 +408,7 @@ try {
             
             $email = filter_var($input['email'] ?? '', FILTER_SANITIZE_EMAIL);
             $password = $input['password'] ?? '';
+            $is_admin = isset($input['is_admin']) && $input['is_admin'] === true;
             
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 sendError('Invalid email format', 400, $logger);
@@ -416,40 +417,94 @@ try {
                 sendError('Password is required', 400, $logger);
             }
             
-            $stmt = $conn->prepare("SELECT id, first_name, last_name, email, phone, password_hash, email_verified, bvn_verified, nin_verified FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            if ($result->num_rows === 0) {
-                sendError('Invalid email or password', 401, $logger);
+            if ($is_admin) {
+                // Admin login
+                $stmt = $conn->prepare("SELECT id, full_name, email, password_hash, role, is_active FROM admins WHERE email = ?");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows === 0) {
+                    sendError('Invalid email or password', 401, $logger);
+                }
+                
+                $admin = $result->fetch_assoc();
+                if (!password_verify($password, $admin['password_hash'])) {
+                    sendError('Invalid email or password', 401, $logger);
+                }
+                
+                if (!$admin['is_active']) {
+                    sendError('Admin account is not active', 403, $logger);
+                }
+                
+                // Update last login
+                $stmt = $conn->prepare("UPDATE admins SET last_login = NOW() WHERE id = ?");
+                $stmt->bind_param("i", $admin['id']);
+                $stmt->execute();
+                
+                // Set admin session
+                SessionManager::regenerateSession();
+                $_SESSION['admin_id'] = $admin['id'];
+                $_SESSION['admin'] = [
+                    'fullName' => $admin['full_name'],
+                    'email' => $admin['email'],
+                    'role' => $admin['role']
+                ];
+                
+                // Log admin activity
+                $stmt = $conn->prepare("INSERT INTO admin_activity_logs (admin_id, action, target_type, description, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?)");
+                $action = 'admin_login';
+                $target_type = 'system';
+                $description = "Admin {$admin['email']} logged in";
+                $ip_address = $_SERVER['REMOTE_ADDR'];
+                $user_agent = $_SERVER['HTTP_USER_AGENT'];
+                $stmt->bind_param("isssss", $admin['id'], $action, $target_type, $description, $ip_address, $user_agent);
+                $stmt->execute();
+                
+                sendSuccess('Admin login successful', [
+                    'admin' => [
+                        'fullName' => $admin['full_name'],
+                        'email' => $admin['email'],
+                        'role' => $admin['role']
+                    ]
+                ], $logger, $new_csrf_token);
+            } else {
+                // User login
+                $stmt = $conn->prepare("SELECT id, first_name, last_name, email, phone, password_hash, email_verified, bvn_verified, nin_verified FROM users WHERE email = ?");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows === 0) {
+                    sendError('Invalid email or password', 401, $logger);
+                }
+                
+                $user = $result->fetch_assoc();
+                if (!password_verify($password, $user['password_hash'])) {
+                    sendError('Invalid email or password', 401, $logger);
+                }
+                
+                // Allow login even if email is not verified
+                SessionManager::regenerateSession();
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user'] = [
+                    'firstName' => $user['first_name'],
+                    'lastName' => $user['last_name'],
+                    'email' => $user['email'],
+                    'phone' => $user['phone'],
+                    'bvnVerified' => (bool)$user['bvn_verified'],
+                    'ninVerified' => (bool)$user['nin_verified'],
+                    'emailVerified' => (bool)$user['email_verified']
+                ];
+                
+                sendSuccess('Login successful', [
+                    'email_verified' => $user['email_verified'],
+                    'verification_status' => [
+                        'bvn' => $user['bvn_verified'],
+                        'nin' => $user['nin_verified']
+                    ]
+                ], $logger, $new_csrf_token);
             }
-            
-            $user = $result->fetch_assoc();
-            if (!password_verify($password, $user['password_hash'])) {
-                sendError('Invalid email or password', 401, $logger);
-            }
-            
-            // Allow login even if email is not verified
-            SessionManager::regenerateSession();
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user'] = [
-                'firstName' => $user['first_name'],
-                'lastName' => $user['last_name'],
-                'email' => $user['email'],
-                'phone' => $user['phone'],
-                'bvnVerified' => (bool)$user['bvn_verified'],
-                'ninVerified' => (bool)$user['nin_verified'],
-                'emailVerified' => (bool)$user['email_verified']
-            ];
-            
-            sendSuccess('Login successful', [
-                'email_verified' => $user['email_verified'],
-                'verification_status' => [
-                    'bvn' => $user['bvn_verified'],
-                    'nin' => $user['nin_verified']
-                ]
-            ], $logger, $new_csrf_token);
             break;
 
         case 'resend_verification':
