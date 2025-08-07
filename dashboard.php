@@ -17,18 +17,27 @@ $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
 
-// Fetch wallet balance
-$stmt = $conn->prepare("SELECT balance FROM wallets WHERE user_id = ?");
+// Check if account is set up
+$stmt = $conn->prepare("SELECT id, balance, account_number FROM accounts WHERE user_id = ?");
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
-$wallet = $stmt->get_result()->fetch_assoc();
-$balance = $wallet ? number_format($wallet['balance'], 2) : '0.00';
+$accountResult = $stmt->get_result();
+$accountExists = $accountResult->num_rows > 0;
+$account = $accountExists ? $accountResult->fetch_assoc() : ['balance' => 0.00, 'account_number' => 'Not Set'];
+$balance = number_format($account['balance'], 2);
+$account_number = $account['account_number'];
 
 // Fetch recent transactions
 $stmt = $conn->prepare("SELECT type, amount, status, reference, created_at FROM transactions WHERE user_id = ? OR recipient_id = ? ORDER BY created_at DESC LIMIT 5");
 $stmt->bind_param("ii", $_SESSION['user_id'], $_SESSION['user_id']);
 $stmt->execute();
 $transactions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+// Fetch saved beneficiaries
+$stmt = $conn->prepare("SELECT name, account_number, bank_name FROM beneficiaries WHERE user_id = ?");
+$stmt->bind_param("i", $_SESSION['user_id']);
+$stmt->execute();
+$beneficiaries = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $db->close();
 ?>
@@ -44,70 +53,187 @@ $db->close();
     <script src="assets/js/dashboard.js"></script>
     <style>
         /* Compact Verification Status */
-.verification-status {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 12px;
-    padding: 1rem;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
+        .verification-status {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
 
-.section-title {
-    color: #1f2937;
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 0.75rem 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
+        .section-title {
+            color: #1f2937;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 0.75rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
 
-.verification-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
+        .verification-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
 
-.verification-item:last-child {
-    border-bottom: none;
-}
+        .verification-item:last-child {
+            border-bottom: none;
+        }
 
-.verification-item span {
-    color: #6b7280;
-    font-size: 0.85rem;
-    flex: 1;
-}
+        .verification-item span {
+            color: #6b7280;
+            font-size: 0.85rem;
+            flex: 1;
+        }
 
-.verification-item i {
-    font-size: 1rem;
-    margin-right: 0.5rem;
-}
+        .verification-item i {
+            font-size: 1rem;
+            margin-right: 0.5rem;
+        }
 
-.verification-item i.verified {
-    color: #10b981;
-}
+        .verification-item i.verified {
+            color: #10b981;
+        }
 
-.verification-item i.unverified {
-    color: #f59e0b;
-}
+        .verification-item i.unverified {
+            color: #f59e0b;
+        }
 
-.btn-small {
-    background: #3b82f6;
-    color: white;
-    border: none;
-    padding: 0.25rem 0.5rem;
-    border-radius: 6px;
-    font-size: 0.7rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
+        .btn-small {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
 
-.btn-small:hover {
-    background: #2563eb;
-    transform: translateY(-1px);
-}
+        .btn-small:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        /* 3x3 Grid for Quick Actions */
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .quick-item {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .quick-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .quick-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            font-size: 16px;
+            color: var(--white);
+        }
+
+        .quick-icon.transfer { background: linear-gradient(45deg, #0ea5e9, #0284c7); }
+        .quick-icon.airtime { background: linear-gradient(45deg, #10b981, #059669); }
+        .quick-icon.bills { background: linear-gradient(45deg, #8b5cf6, #7c3aed); }
+        .quick-icon.card { background: linear-gradient(45deg, #f59e0b, #d97706); }
+        .quick-icon.account { background: linear-gradient(45deg, #ec4899, #db2777); }
+        .quick-icon.history { background: linear-gradient(45deg, #6b7280, #4b5563); }
+
+        .quick-text {
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .cashback-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            background: #f59e0b;
+            color: white;
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 10px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
+
+        .modal-content button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .modal-content button:hover {
+            background: #2563eb;
+        }
     </style>
 </head>
 <body>
@@ -170,25 +296,17 @@ $db->close();
                     <i class="fas fa-exchange-alt"></i>
                     Transactions
                 </a>
-                <a href="send_money.php" class="nav-item">
+                <a href="transfer.php" class="nav-item">
                     <i class="fas fa-paper-plane"></i>
                     Send Money
                 </a>
-                <div class="nav-subitem">
-                    <i class="fas fa-circle" style="font-size: 6px; margin-right: 8px;"></i>
-                    P2P Transfer
-                </div>
-                <div class="nav-subitem">
-                    <i class="fas fa-circle" style="font-size: 6px; margin-right: 8px;"></i>
-                    International Transfer
-                </div>
-                <a href="converter.php" class="nav-item">
-                    <i class="fas fa-sync-alt"></i>
-                    Converter
+                <a href="airtime.php" class="nav-item">
+                    <i class="fas fa-mobile-alt"></i>
+                    Airtime & Data
                 </a>
-                <a href="track_payment.php" class="nav-item">
-                    <i class="fas fa-search"></i>
-                    Track Payment
+                <a href="bills.php" class="nav-item">
+                    <i class="fas fa-file-invoice"></i>
+                    Pay Bills
                 </a>
                 <a href="cards.php" class="nav-item">
                     <i class="fas fa-credit-card"></i>
@@ -257,6 +375,7 @@ $db->close();
 
             <div class="content-grid">
                 <div class="left-content">
+                    <!-- Verification Status -->
                     <div class="verification-status">
                         <h3 class="section-title">Account Verification</h3>
                         <div class="verification-item">
@@ -282,52 +401,67 @@ $db->close();
                         </div>
                     </div>
 
+                    <!-- Account Balance Card -->
                     <div class="balance-card">
                         <div class="balance-header">
-                            <h2 class="balance-title">Your Balance</h2>
+                            <h2 class="balance-title">Your Account Balance</h2>
                             <button class="eye-icon">
                                 <i class="fas fa-eye-slash"></i>
                             </button>
                         </div>
                         <div class="balance-amount">₦<?php echo $balance; ?></div>
-                        <div class="balance-status">Available</div>
-                        
+                        <div class="balance-status">Available • Account: <?php echo htmlspecialchars($account_number); ?></div>
                     </div>
 
+                    <!-- Action Buttons -->
                     <div class="action-buttons">
-                        <button class="action-btn send-btn" onclick="window.location.href='send_money.php'">
+                        <button class="action-btn send-btn" onclick="checkAccountBeforeAction('transfer.php')">
                             <i class="fas fa-paper-plane"></i>
                             Send Money
                         </button>
-                        <button class="action-btn add-btn" onclick="window.location.href='add_money.php'">
+                        <button class="action-btn add-btn" onclick="checkAccountBeforeAction('add_money.php')">
                             <i class="fas fa-plus"></i>
                             Add Money
                         </button>
                     </div>
 
+                    <!-- Quick Actions -->
                     <div class="quick-actions">
                         <h3 class="section-title">Quick Actions</h3>
                         <div class="quick-grid">
-                            <a href="send_money.php" class="quick-item">
-                                <div class="quick-icon">
-                                    <i class="fas fa-users"></i>
+                            <a href="api/wallet/transfer.php" class="quick-item" onclick="checkAccountBeforeAction('transfer.php'); return false;">
+                                <div class="quick-icon transfer">
+                                    <i class="fas fa-exchange-alt"></i>
                                 </div>
-                                <div class="quick-text">P2P Transfer</div>
+                                <div class="quick-text">Bank Transfer</div>
                             </a>
-                            <a href="send_money.php" class="quick-item">
-                                <div class="quick-icon">
-                                    <i class="fas fa-paper-plane"></i>
+                            <a href="airtime.php" class="quick-item" onclick="checkAccountBeforeAction('airtime.php'); return false;">
+                                <div class="quick-icon airtime">
+                                    <i class="fas fa-mobile-alt"></i>
                                 </div>
-                                <div class="quick-text">International Transfer</div>
+                                <div class="quick-text">Airtime & Data</div>
+                                <div class="cashback-badge">6%</div>
+                            </a>
+                            <a href="bills.php" class="quick-item" onclick="checkAccountBeforeAction('bills.php'); return false;">
+                                <div class="quick-icon bills">
+                                    <i class="fas fa-file-invoice"></i>
+                                </div>
+                                <div class="quick-text">Pay Bills</div>
                             </a>
                             <a href="cards.php" class="quick-item">
-                                <div class="quick-icon">
-                                    <i class="fas fa-plus"></i>
+                                <div class="quick-icon card">
+                                    <i class="fas fa-credit-card"></i>
                                 </div>
-                                <div class="quick-text">Setup Wallet</div>
+                                <div class="quick-text">Payment Methods</div>
+                            </a>
+                            <a href="api/wallet/wallet.php" class="quick-item">
+                                <div class="quick-icon account">
+                                    <i class="fas fa-wallet"></i>
+                                </div>
+                                <div class="quick-text">My Account</div>
                             </a>
                             <a href="transactions.php" class="quick-item">
-                                <div class="quick-icon">
+                                <div class="quick-icon history">
                                     <i class="fas fa-history"></i>
                                 </div>
                                 <div class="quick-text">Transaction History</div>
@@ -335,37 +469,37 @@ $db->close();
                         </div>
                     </div>
 
+                    <!-- Saved Beneficiaries -->
                     <div class="saved-beneficiaries">
                         <div class="beneficiaries-header">
                             <h3 class="section-title">Saved Beneficiaries</h3>
-                            <button class="add-beneficiary" onclick="window.location.href='send_money.php'">
+                            <button class="add-beneficiary" onclick="window.location.href='transfer.php'">
                                 <i class="fas fa-plus"></i> Add
                             </button>
                         </div>
-                        <?php
-                        // Placeholder: Fetch beneficiaries from database in future
-                        $beneficiaries = [
-                           
-                        ];
-                        foreach ($beneficiaries as $b) {
-                            echo '
-                            <div class="beneficiary-item">
-                                <div class="beneficiary-avatar">' . substr($b['name'], 0, 1) . substr(explode(' ', $b['name'])[1], 0, 1) . '</div>
-                                <div class="beneficiary-info">
-                                    <h4>' . htmlspecialchars($b['name']) . '</h4>
-                                    <div class="beneficiary-account">' . htmlspecialchars($b['account']) . ' • ' . htmlspecialchars($b['bank']) . '</div>
+                        <?php if (empty($beneficiaries)): ?>
+                            <p>No saved beneficiaries. Add one to make transfers faster.</p>
+                        <?php else: ?>
+                            <?php foreach ($beneficiaries as $b): ?>
+                                <div class="beneficiary-item">
+                                    <div class="beneficiary-avatar"><?php echo substr($b['name'], 0, 1) . (isset(explode(' ', $b['name'])[1]) ? substr(explode(' ', $b['name'])[1], 0, 1) : ''); ?></div>
+                                    <div class="beneficiary-info">
+                                        <h4><?php echo htmlspecialchars($b['name']); ?></h4>
+                                        <div class="beneficiary-account"><?php echo htmlspecialchars($b['account_number']) . ' • ' . htmlspecialchars($b['bank_name']); ?></div>
+                                    </div>
                                 </div>
-                            </div>';
-                        }
-                        ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
 
+                    <!-- Help Section -->
                     <div class="help-section">
                         <h3 class="help-title">Need Help?</h3>
                         <p class="help-text">Our support team is available 24/7 to assist you with any questions.</p>
                         <button class="contact-btn" onclick="window.location.href='support.php'">Contact Support</button>
                     </div>
 
+                    <!-- Recent Transactions -->
                     <div class="recent-transactions">
                         <div class="transactions-header">
                             <h3 class="section-title">Recent Transactions</h3>
@@ -396,23 +530,28 @@ $db->close();
                     </div>
                 </div>
 
+                <!-- Right Sidebar -->
                 <div class="right-sidebar">
                     <div class="saved-beneficiaries">
                         <div class="beneficiaries-header">
                             <h3 class="section-title">Saved Beneficiaries</h3>
-                            <button class="add-beneficiary" onclick="window.location.href='send_money.php'">
+                            <button class="add-beneficiary" onclick="window.location.href='transfer.php'">
                                 <i class="fas fa-plus"></i> Add
                             </button>
                         </div>
-                        <?php foreach ($beneficiaries as $b): ?>
-                            <div class="beneficiary-item">
-                                <div class="beneficiary-avatar"><?php echo substr($b['name'], 0, 1) . substr(explode(' ', $b['name'])[1], 0, 1); ?></div>
-                                <div class="beneficiary-info">
-                                    <h4><?php echo htmlspecialchars($b['name']); ?></h4>
-                                    <div class="beneficiary-account"><?php echo htmlspecialchars($b['account']) . ' • ' . htmlspecialchars($b['bank']); ?></div>
+                        <?php if (empty($beneficiaries)): ?>
+                            <p>No saved beneficiaries.</p>
+                        <?php else: ?>
+                            <?php foreach ($beneficiaries as $b): ?>
+                                <div class="beneficiary-item">
+                                    <div class="beneficiary-avatar"><?php echo substr($b['name'], 0, 1) . (isset(explode(' ', $b['name'])[1]) ? substr(explode(' ', $b['name'])[1], 0, 1) : ''); ?></div>
+                                    <div class="beneficiary-info">
+                                        <h4><?php echo htmlspecialchars($b['name']); ?></h4>
+                                        <div class="beneficiary-account"><?php echo htmlspecialchars($b['account_number']) . ' • ' . htmlspecialchars($b['bank_name']); ?></div>
+                                    </div>
                                 </div>
-                            </div>
-                        <?php endforeach; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
 
                     <div class="help-section">
@@ -425,9 +564,38 @@ $db->close();
         </main>
     </div>
 
+    <!-- Modal for Account Setup -->
+    <div id="accountSetupModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Setup Your Account</h2>
+            <p>You need to set up your account before you can perform this action. Follow these steps:</p>
+            <ol>
+                <li>Click "Setup Account" in the quick actions below.</li>
+                <li>Follow the instructions to create your account.</li>
+                <li>Once set up, you can send and add money.</li>
+            </ol>
+            <button onclick="window.location.href='setup_account.php'">Setup Now</button>
+        </div>
+    </div>
+
     <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
 
     <script>
+    const accountExists = <?php echo json_encode($accountExists); ?>;
+
+    function checkAccountBeforeAction(url) {
+        if (!accountExists) {
+            document.getElementById('accountSetupModal').style.display = 'block';
+        } else {
+            window.location.href = url;
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('accountSetupModal').style.display = 'none';
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const resendBtn = document.getElementById('resendVerification');
         if (resendBtn) {
